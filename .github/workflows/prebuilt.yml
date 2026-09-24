@@ -1,0 +1,119 @@
+name: prebuilt-librdkafka
+
+# 构建预编译 librdkafka 静态库并挂到 GitHub Release：
+# - 推 v* tag 时：产物挂到该 tag 的 Release
+# - 手动 workflow_dispatch：更新名为 prebuilt 的滚动 Release
+# 产物命名 librdkafka-<target>.tar.gz（Unix 含 librdkafka.a，MSVC 含 rdkafka.lib），
+# 与 build.rs 的 LIBRDKAFKA_PREBUILT_DIR 机制配套。feature 集固定：
+# zlib+zstd+lz4-ext+snappy，无 SSL/SASL/CURL（与 kafka-manager 一致）。
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            lib_name: librdkafka.a
+            lib_path: build/src/librdkafka.a
+          - os: macos-13
+            target: x86_64-apple-darwin
+            lib_name: librdkafka.a
+            lib_path: build/src/librdkafka.a
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            lib_name: librdkafka.a
+            lib_path: build/src/librdkafka.a
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            lib_name: rdkafka.lib
+            lib_path: build/src/Release/rdkafka.lib
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies (Linux, glibc 2.35 baseline)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential zlib1g-dev libzstd-dev liblz4-dev
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install cmake zstd lz4
+
+      - name: Install dependencies (Windows, vcpkg static-md)
+        if: runner.os == 'Windows'
+        run: |
+          # static-md：静态库 + 动态 CRT（/MD），与 Rust MSVC 默认 CRT 一致；
+          # 用 x64-windows-static（/MT）会在最终链接时 CRT 冲突
+          vcpkg install zlib:x64-windows-static-md zstd:x64-windows-static-md lz4:x64-windows-static-md
+
+      - name: Configure (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cmake -S librdkafka -B build \
+            -DRDKAFKA_BUILD_STATIC=1 -DRDKAFKA_BUILD_TESTS=0 -DRDKAFKA_BUILD_EXAMPLES=0 \
+            -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DWITH_ZLIB=1 -DWITH_CURL=0 -DWITH_SSL=0 -DWITH_SASL=0 \
+            -DWITH_ZSTD=1 -DENABLE_LZ4_EXT=1 -DWITH_SNAPPY=1 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix 2>/dev/null || echo /usr/local)"
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cmake -S librdkafka -B build `
+            -DRDKAFKA_BUILD_STATIC=1 -DRDKAFKA_BUILD_TESTS=0 -DRDKAFKA_BUILD_EXAMPLES=0 `
+            -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_POLICY_VERSION_MINIMUM=3.5 `
+            -DWITH_ZLIB=1 -DWITH_CURL=0 -DWITH_SSL=0 -DWITH_SASL=0 `
+            -DWITH_ZSTD=1 -DENABLE_LZ4_EXT=1 -DWITH_SNAPPY=1 `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
+
+      - name: Build
+        run: cmake --build build --target rdkafka --config Release --parallel
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "${{ matrix.lib_path }}"
+          mkdir -p dist/licenses
+          cp "${{ matrix.lib_path }}" "dist/${{ matrix.lib_name }}"
+          # BSD 2-Clause 第 2 条：二进制再分发必须附带版权声明与免责声明
+          cp librdkafka/LICENSE librdkafka/LICENSES.txt librdkafka/LICENSE.* dist/licenses/ 2>/dev/null || true
+          tar -C dist -czf "librdkafka-${{ matrix.target }}.tar.gz" "${{ matrix.lib_name }}" licenses
+          sha256sum "librdkafka-${{ matrix.target }}.tar.gz" > "librdkafka-${{ matrix.target }}.tar.gz.sha256"
+          cat "librdkafka-${{ matrix.target }}.tar.gz.sha256"
+
+      - name: Upload to Release (tag push)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            librdkafka-${{ matrix.target }}.tar.gz
+            librdkafka-${{ matrix.target }}.tar.gz.sha256
+
+      - name: Upload to Release (manual, rolling "prebuilt" release)
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: prebuilt
+          name: Prebuilt librdkafka (rolling)
+          body: Rolling prebuilt static librdkafka archives. Feature set: zlib+zstd+lz4-ext+snappy, no SSL/SASL/CURL. Use with LIBRDKAFKA_PREBUILT_DIR (see README).
+          files: |
+            librdkafka-${{ matrix.target }}.tar.gz
+            librdkafka-${{ matrix.target }}.tar.gz.sha256

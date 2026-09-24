@@ -218,6 +218,30 @@ fn build_librdkafka() {
 
 #[cfg(feature = "cmake-build")]
 fn build_librdkafka() {
+    // [LOCAL PATCH] LIBRDKAFKA_PREBUILT_DIR：跳过 cmake 编译，直接链接预编译静态库。
+    // 目录必须包含 librdkafka.a（Unix）或 rdkafka.lib（MSVC），且 feature 集必须一致
+    // （kafka-manager 组合：zlib+zstd+lz4-ext+snappy，无 SSL/SASL/CURL）。
+    // 压缩库（libz-sys/zstd-sys/lz4-sys）仍是正常 cargo 依赖、自行链接；预制的只有 librdkafka。
+    // 预编译产物见 https://github.com/sufar/rdkafka-sys/releases
+    println!("cargo:rerun-if-env-changed=LIBRDKAFKA_PREBUILT_DIR");
+    if let Ok(prebuilt) = env::var("LIBRDKAFKA_PREBUILT_DIR") {
+        let lib = if cfg!(target_env = "msvc") {
+            "rdkafka.lib"
+        } else {
+            "librdkafka.a"
+        };
+        let path = Path::new(&prebuilt).join(lib);
+        assert!(
+            path.is_file(),
+            "LIBRDKAFKA_PREBUILT_DIR={} 下找不到 {}",
+            prebuilt, lib
+        );
+        eprintln!("rdkafka-sys: linking prebuilt {}", path.display());
+        println!("cargo:rustc-link-search=native={}", prebuilt);
+        println!("cargo:rustc-link-lib=static=rdkafka");
+        return;
+    }
+
     let mut config = cmake::Config::new("librdkafka");
     let mut cmake_library_paths = vec![];
 

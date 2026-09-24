@@ -1,5 +1,11 @@
 # Changelog
 
+## v4.10.0+2.15.1 (local, 2026-10, update 2)
+* [LOCAL PATCH] build.rs: LIBRDKAFKA_PREBUILT_DIR env var links a prebuilt
+  static librdkafka (from GitHub Releases) and skips the cmake build.
+* [LOCAL] README rewritten to document why this fork exists; added
+  .github/workflows/prebuilt.yml to build prebuilt archives (Linux/macOS/Windows).
+
 ## v4.10.0+2.15.1 (local, 2026-10)
 * [LOCAL PATCH] Bump vendored librdkafka to v2.15.1 (from v2.12.1).
   Keeps local build.rs patch: cmake builds explicitly define WITH_SNAPPY=1
