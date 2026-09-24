@@ -26,22 +26,27 @@ jobs:
             target: x86_64-unknown-linux-gnu
             lib_name: librdkafka.a
             lib_path: build/src/librdkafka.a
+            cmake_extra: ""
           - os: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
             lib_name: librdkafka.a
             lib_path: build/src/librdkafka.a
-          - os: macos-13
+            cmake_extra: ""
+          - os: macos-latest
             target: x86_64-apple-darwin
             lib_name: librdkafka.a
             lib_path: build/src/librdkafka.a
+            cmake_extra: "-DCMAKE_OSX_ARCHITECTURES=x86_64"
           - os: macos-latest
             target: aarch64-apple-darwin
             lib_name: librdkafka.a
             lib_path: build/src/librdkafka.a
+            cmake_extra: ""
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             lib_name: rdkafka.lib
             lib_path: build/src/Release/rdkafka.lib
+            cmake_extra: ""
 
     runs-on: ${{ matrix.os }}
 
@@ -77,7 +82,8 @@ jobs:
             -DWITH_ZLIB=1 -DWITH_CURL=0 -DWITH_SSL=0 -DWITH_SASL=0 \
             -DWITH_ZSTD=1 -DENABLE_LZ4_EXT=1 -DWITH_SNAPPY=1 \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$(brew --prefix 2>/dev/null || echo /usr/local)"
+            -DCMAKE_PREFIX_PATH="$(brew --prefix 2>/dev/null || echo /usr/local)" \
+            ${{ matrix.cmake_extra }}
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
@@ -101,6 +107,10 @@ jobs:
         run: |
           set -euo pipefail
           test -f "${{ matrix.lib_path }}"
+          # mac 产物验证目标架构（防止交叉编译配置漂移产出错误架构）
+          if command -v lipo >/dev/null 2>&1; then
+            lipo -archs "${{ matrix.lib_path }}"
+          fi
           mkdir -p dist/licenses
           cp "${{ matrix.lib_path }}" "dist/${{ matrix.lib_name }}"
           # BSD 2-Clause 第 2 条：二进制再分发必须附带版权声明与免责声明
