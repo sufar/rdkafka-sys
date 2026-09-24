@@ -53,3 +53,9 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# Rust build output
+/target
+
+# vendored shell module, not a Windows import library
+!librdkafka/mklove/modules/configure.lib
