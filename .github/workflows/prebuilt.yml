@@ -26,6 +26,10 @@ jobs:
             target: x86_64-unknown-linux-gnu
             lib_name: librdkafka.a
             lib_path: build/src/librdkafka.a
+          - os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            lib_name: librdkafka.a
+            lib_path: build/src/librdkafka.a
           - os: macos-13
             target: x86_64-apple-darwin
             lib_name: librdkafka.a

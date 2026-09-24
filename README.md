@@ -58,8 +58,8 @@ cargo build
 - 预编译库的 feature 集固定为：**zlib + zstd + lz4-ext + snappy，无 SSL/SASL/CURL**
   （与 kafka-manager 的 rdkafka feature 集一致）。压缩库本身（libz-sys/zstd-sys/lz4-sys）
   仍由 cargo 正常编译链接，预制的只有 librdkafka。
-- Linux 产物与构建机 glibc 绑定：CI 产物基于 ubuntu-22.04（glibc 2.35）；
-  早期手动上传的本地产物要求 glibc ≥ 2.43，文件名带 `-glibc2.43` 标记，二者都在 Release 中，按机器选择。
+- Linux 产物与构建机 glibc 绑定：CI 产物基于 ubuntu-22.04（glibc 2.35，x86_64 与 aarch64）；
+  早期手动上传的本地产物（aarch64）要求 glibc ≥ 2.43，文件名带 `-glibc2.43` 标记，二者都在 Release 中，按机器选择。
 
 ## 开源协议 / License
 
