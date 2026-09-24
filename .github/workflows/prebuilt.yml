@@ -62,8 +62,11 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           # static-md：静态库 + 动态 CRT（/MD），与 Rust MSVC 默认 CRT 一致；
-          # 用 x64-windows-static（/MT）会在最终链接时 CRT 冲突
-          vcpkg install zlib:x64-windows-static-md zstd:x64-windows-static-md lz4:x64-windows-static-md
+          # 用 x64-windows-static（/MT）会在最终链接时 CRT 冲突。
+          # 新 runner 镜像不再设置 VCPKG_ROOT（改用 VCPKG_INSTALLATION_ROOT），做兼容回退。
+          $vcpkg = if ($env:VCPKG_ROOT) { $env:VCPKG_ROOT } elseif ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { "C:\vcpkg" }
+          echo "vcpkg root: $vcpkg"
+          & "$vcpkg\vcpkg.exe" install --triplet x64-windows-static-md zlib zstd lz4
 
       - name: Configure (Unix)
         if: runner.os != 'Windows'
@@ -79,13 +82,16 @@ jobs:
       - name: Configure (Windows)
         if: runner.os == 'Windows'
         run: |
+          # -D 参数全部加引号：PowerShell 会把 -DFOO=3.5 拆成 -DFOO=3 和 .5 两个参数
+          $vcpkg = if ($env:VCPKG_ROOT) { $env:VCPKG_ROOT } elseif ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { "C:\vcpkg" }
           cmake -S librdkafka -B build `
-            -DRDKAFKA_BUILD_STATIC=1 -DRDKAFKA_BUILD_TESTS=0 -DRDKAFKA_BUILD_EXAMPLES=0 `
-            -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_POLICY_VERSION_MINIMUM=3.5 `
-            -DWITH_ZLIB=1 -DWITH_CURL=0 -DWITH_SSL=0 -DWITH_SASL=0 `
-            -DWITH_ZSTD=1 -DENABLE_LZ4_EXT=1 -DWITH_SNAPPY=1 `
-            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
-            -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
+            "-DRDKAFKA_BUILD_STATIC=1" "-DRDKAFKA_BUILD_TESTS=0" "-DRDKAFKA_BUILD_EXAMPLES=0" `
+            "-DCMAKE_INSTALL_LIBDIR=lib" "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" `
+            "-DWITH_ZLIB=1" "-DWITH_CURL=0" "-DWITH_SSL=0" "-DWITH_SASL=0" `
+            "-DWITH_ZSTD=1" "-DENABLE_LZ4_EXT=1" "-DWITH_SNAPPY=1" `
+            "-DCMAKE_TOOLCHAIN_FILE=$vcpkg/scripts/buildsystems/vcpkg.cmake" `
+            "-DVCPKG_TARGET_TRIPLET=x64-windows-static-md" `
+            "-DVCPKG_MANIFEST_MODE=OFF"
 
       - name: Build
         run: cmake --build build --target rdkafka --config Release --parallel
