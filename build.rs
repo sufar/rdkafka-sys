@@ -230,14 +230,26 @@ fn build_librdkafka() {
         } else {
             "librdkafka.a"
         };
-        let path = Path::new(&prebuilt).join(lib);
-        assert!(
-            path.is_file(),
-            "LIBRDKAFKA_PREBUILT_DIR={} 下找不到 {}",
-            prebuilt, lib
-        );
+        // 优先 <dir>/<target-triple>/<lib>（多目标构建，如 universal-apple-darwin），
+        // 其次 <dir>/<lib>（单目标）。
+        let target = env::var("TARGET").unwrap_or_default();
+        let path = [
+            Path::new(&prebuilt).join(&target).join(lib),
+            Path::new(&prebuilt).join(lib),
+        ]
+        .into_iter()
+        .find(|p| p.is_file())
+        .unwrap_or_else(|| {
+            panic!(
+                "LIBRDKAFKA_PREBUILT_DIR={} 下找不到 {}（已尝试根目录与 {}/ 子目录）",
+                prebuilt, lib, target
+            )
+        });
         eprintln!("rdkafka-sys: linking prebuilt {}", path.display());
-        println!("cargo:rustc-link-search=native={}", prebuilt);
+        println!(
+            "cargo:rustc-link-search=native={}",
+            path.parent().unwrap().display()
+        );
         println!("cargo:rustc-link-lib=static=rdkafka");
         return;
     }

@@ -117,7 +117,7 @@ jobs:
         with:
           tag_name: prebuilt
           name: Prebuilt librdkafka (rolling)
-          body: Rolling prebuilt static librdkafka archives. Feature set: zlib+zstd+lz4-ext+snappy, no SSL/SASL/CURL. Use with LIBRDKAFKA_PREBUILT_DIR (see README).
+          body: 'Rolling prebuilt static librdkafka archives. Feature set: zlib+zstd+lz4-ext+snappy, no SSL/SASL/CURL. Use with LIBRDKAFKA_PREBUILT_DIR (see README).'
           files: |
             librdkafka-${{ matrix.target }}.tar.gz
             librdkafka-${{ matrix.target }}.tar.gz.sha256
