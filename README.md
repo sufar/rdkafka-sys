@@ -50,16 +50,23 @@ export LIBRDKAFKA_PREBUILT_DIR=/path/to/prebuilt
 cargo build
 ```
 
-预编译产物在本仓库 [Releases](../../releases) 中（`librdkafka-<target>.tar.gz` + `.sha256`），
-由 [.github/workflows/prebuilt.yml](./.github/workflows/prebuilt.yml) 构建。
+预编译产物在本仓库 [Releases](../../releases) 中（`librdkafka-<target>.tar.gz` + `.sha256`，
+包内附带 `licenses/` 协议文本），由 [.github/workflows/prebuilt.yml](./.github/workflows/prebuilt.yml) 构建：
+- **`prebuilt`**：滚动 release（workflow_dispatch 触发），包含全部平台：
+  x86_64/aarch64 Linux（ubuntu-22.04，glibc 2.35）、x86_64/aarch64 macOS、x86_64 Windows MSVC；
+- **版本 tag release**（如 `v4.10.0+2.15.1`）：推 tag 时构建，另含手动上传的本机版
+  `librdkafka-aarch64-unknown-linux-gnu-glibc2.43.tar.gz`（要求 glibc ≥ 2.43）。
+
+多目标构建（如 `universal-apple-darwin`）：`LIBRDKAFKA_PREBUILT_DIR` 指向含
+`<target-triple>/librdkafka.a` 子目录的父目录即可，build.rs 按当前 TARGET 自动匹配子目录
+（kafka-manager 的 `scripts/fetch_prebuilt_librdkafka.sh` 已按此布局下载）。
 
 **约束（违反会在链接/运行期报错）**：
 
 - 预编译库的 feature 集固定为：**zlib + zstd + lz4-ext + snappy，无 SSL/SASL/CURL**
   （与 kafka-manager 的 rdkafka feature 集一致）。压缩库本身（libz-sys/zstd-sys/lz4-sys）
   仍由 cargo 正常编译链接，预制的只有 librdkafka。
-- Linux 产物与构建机 glibc 绑定：CI 产物基于 ubuntu-22.04（glibc 2.35，x86_64 与 aarch64）；
-  早期手动上传的本地产物（aarch64）要求 glibc ≥ 2.43，文件名带 `-glibc2.43` 标记，二者都在 Release 中，按机器选择。
+- Linux 产物与构建机 glibc 绑定：CI 产物基于 ubuntu-22.04（glibc 2.35，x86_64 与 aarch64）。
 
 ## 开源协议 / License
 
